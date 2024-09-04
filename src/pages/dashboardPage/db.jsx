@@ -11,25 +11,13 @@ const Dashboard = () => {
   const { suid } = useParams();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate('/');
-    } catch (error) {
-      console.error('Error signing out: ', error.message);
-    }
-  };
+
 
   const isMobile = useMediaQuery({ maxWidth: 767 }); // Consider screens with max-width 767px as mobile
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <button
-        onClick={handleLogout}
-        className="w-full p-3 bg-red-500 text-white rounded-lg mt-4 hover:bg-red-600 transition duration-300 ease-in-out"
-      >
-        Logout
-      </button>
+    <div className="min-h-screen bg-gray-100 ">
+     
       
       {isMobile ? <PhoneDb /> : <DesktopDb />}
     </div>
