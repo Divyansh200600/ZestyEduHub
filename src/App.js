@@ -7,6 +7,8 @@ import Dashboard from './pages/dashboardPage/db';
 import SettingsPage from './components/dashboardFeatures/settings/SettingsPage'; // Import the SettingsPage component
 import PrivateRoute from './utils/PrivateRoute';
 import LoadingScreen from './components/loginComponents/LoadingScreen';
+import FriendDetailPage from './pages/friendsChats/friendChats';
+import GroupInfoPage from './pages/groupChats/groupChat';
 
 const App = () => {
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,16 @@ const App = () => {
               <Route path="/settings" element={
                 <PrivateRoute>
                   <SettingsPage />
+                </PrivateRoute>
+              } />
+               <Route path="/dashboard/$me/:username" element={
+                <PrivateRoute>
+                  <FriendDetailPage />
+                </PrivateRoute>
+              } />
+               <Route path="/dashboard/:groupName/:groupId" element={
+                <PrivateRoute>
+                  <GroupInfoPage />
                 </PrivateRoute>
               } />
               {/* Add other routes here */}

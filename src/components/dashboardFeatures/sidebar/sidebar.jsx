@@ -7,8 +7,7 @@ import { auth, firestore, storage } from '../../../utils/firebaseConfig';
 import { collection, doc, getDoc, setDoc, query, where, onSnapshot, deleteDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import DynamicProfile from './DynamicProfile'; // Import DynamicProfile
-
-
+import { useNavigate } from 'react-router-dom';
 
 Modal.setAppElement('#root');
 
@@ -23,13 +22,14 @@ const Sidebar = () => {
   const [userFriends, setUserFriends] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [selectedFriend, setSelectedFriend] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState(''); // NEW
   const [friendModalIsOpen, setFriendModalIsOpen] = useState(false);
   const [invitationModalOpen, setInvitationModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [profiles, setProfiles] = useState({});
+  const navigate = useNavigate(); // For navigating programmatically
 
- 
   useEffect(() => {
     const fetchUserData = async () => {
       const user = auth.currentUser;
@@ -228,10 +228,27 @@ const Sidebar = () => {
   const handleProfileLoaded = (username, profile) => {
     setProfiles(prevProfiles => ({
       ...prevProfiles,
-      [username]: profile
+      [username]: profile,
     }));
   };
- 
+
+  // New function to handle friend click
+  const handleFriendClick = (friend) => {
+    setSelectedFriend(friend.username); // NEW
+    navigate(`/dashboard/$me/${friend.username}`, {
+      state: { username: friend.username, uid: friend.id },
+    });
+  };
+
+  // NEW function to handle group click
+  const handleGroupClick = (group) => {
+    setSelectedGroup(group.id);
+    navigate(`/dashboard/${group.name}/${group.id}`, {
+      state: { groupName: group.name, groupId: group.id }
+    });
+  };
+  
+
   const filteredZests = allZests.filter(zest => {
     return zest.username !== userData.username
       && zest.username.includes(searchTerm.replace('@', '').toLowerCase())
@@ -280,7 +297,8 @@ const Sidebar = () => {
             <div className="mt-4">
               <div className="flex flex-col space-y-2">
                 {userGroups.map(group => (
-                  <div key={group.id} className="flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer">
+                  <div key={group.id} onClick={() => handleGroupClick(group)} 
+                    className={`flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer ${selectedGroup === group.id ? 'bg-gray-700' : ''}`}>
                     <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
                       {group.iconUrl ? (
                         <img src={group.iconUrl} alt={group.name} className="w-full h-full object-cover rounded-full" />
@@ -316,26 +334,25 @@ const Sidebar = () => {
             </div>
 
             {userFriends.length === 0 ? (
-        <p>You don't have any friends yet. Click on "Add" to find friends.</p>
-      ) : (
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Your Friends</h3>
-          <div className="flex flex-col space-y-2">
-            {userFriends.map(friend => (
-              <div key={friend.id} className="flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer">
-                <DynamicProfile
-                  username={friend.username}
-                  onProfileLoaded={profile => handleProfileLoaded(friend.username, profile)}
-                />
-                <span className="text-white ml-2">
-                  {profiles[friend.username]?.name || friend.name || friend.username}
-                </span>
+              <p>You don't have any friends yet. Click on "Add" to find friends.</p>
+            ) : (
+              <div>
+                <div className="flex flex-col space-y-2">
+                  {userFriends.map(friend => (
+                    <div key={friend.id} onClick={() => handleFriendClick(friend)} 
+                      className={`flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer ${selectedFriend === friend.username ? 'bg-gray-700' : ''}`}>
+                      <DynamicProfile
+                        username={friend.username}
+                        onProfileLoaded={profile => handleProfileLoaded(friend.username, profile)}
+                      />
+                      <span className="text-white ml-2">
+                        {profiles[friend.username]?.name || friend.name || friend.username}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+            )}
           </div>
         )}
       </div>
