@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../../utils/firebaseConfig'; // Import your Firebase config
+import { auth } from '../../../utils/firebaseConfig'; 
 import { fetchUserData } from '../fetchUserData/page';
-import { updateProfile, updatePassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { firestore } from '../../../utils/firebaseConfig'; // Correct import statement
+import { firestore } from '../../../utils/firebaseConfig'; 
+import Swal from 'sweetalert2';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const SettingsPage = () => {
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
+  const [userName, setUserName] = useState('');
   const [profilePhoto, setProfilePhoto] = useState(null);
-  const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const Navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEmailProvider, setIsEmailProvider] = useState(false);
+  const [usernameAvailability, setUsernameAvailability] = useState(true); // New state for username availability
+  const [error, setError] = useState('');
+
+  const navigate = useNavigate();
   const db = firestore;
+  const storage = getStorage();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -22,46 +29,91 @@ const SettingsPage = () => {
         const userData = await fetchUserData(userId);
         setUser(userData);
         setName(userData?.name || '');
-        setProfilePhoto(userData?.profilePhoto || '');
+        setUserName(userData?.username || '');
+        setProfilePhoto(userData?.profilePhoto || 'https://firebasestorage.googleapis.com/v0/b/vr-study-group.appspot.com/o/duggu-store%2Fkawaii-ben.gif?alt=media&token=46095e90-ebbf-48ea-9a27-04af3f501db1');
+
+        const providerId = auth.currentUser?.providerData[0]?.providerId;
+        setIsEmailProvider(providerId === 'password');
       }
     };
 
     fetchUserProfile();
   }, []);
 
+  // Function to check if username is taken
+  const checkUsernameAvailability = async (newUserName) => {
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('username', '==', newUserName));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.empty;
+  };
+
+  // Handle username input change
+  const handleUserNameChange = async (e) => {
+    const newUserName = e.target.value;
+    setUserName(newUserName);
+    
+    if (newUserName) {
+      const isUsernameAvailable = await checkUsernameAvailability(newUserName);
+      setUsernameAvailability(isUsernameAvailable);
+      setError(isUsernameAvailable ? '' : 'Username is already taken.');
+    } else {
+      setUsernameAvailability(true);
+      setError('');
+    }
+  };
+
   const handleProfileUpdate = async () => {
     const userId = auth.currentUser?.uid;
     if (userId) {
       try {
-        await setDoc(doc(db, 'users', userId), { name, profilePhoto }, { merge: true });
-        if (auth.currentUser) {
-          await updateProfile(auth.currentUser, { displayName: name, photoURL: profilePhoto });
+        let photoURL = profilePhoto;
+
+        if (profilePhoto && typeof profilePhoto !== 'string') {
+          const storageRef = ref(storage, `userData/profilePics/${userId}/profilePic`);
+          const snapshot = await uploadBytes(storageRef, profilePhoto);
+          photoURL = await getDownloadURL(snapshot.ref);
         }
-        alert('Profile updated successfully');
+
+        // Check username availability before updating
+        if (!usernameAvailability) {
+          Swal.fire('Error', 'Username is already taken. Please choose a different one.', 'error');
+          return;
+        }
+
+        await setDoc(doc(db, 'users', userId), { name, username: userName, profilePhoto: photoURL }, { merge: true });
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: name, photoURL });
+        }
+
+        Swal.fire('Profile Updated', 'Your profile has been updated successfully!', 'success');
+        setIsEditing(false);
       } catch (error) {
         console.error('Error updating profile:', error);
-        alert('Failed to update profile');
+        Swal.fire('Error', 'Failed to update profile', 'error');
       }
     }
   };
 
-  const handlePasswordChange = async () => {
+  const handleForgotPassword = async () => {
     if (auth.currentUser) {
-      try {
-        await updatePassword(auth.currentUser, newPassword);
-        alert('Password changed successfully');
-        setPassword('');
-        setNewPassword('');
-      } catch (error) {
-        console.error('Error changing password:', error);
-        alert('Failed to change password');
+      if (isEmailProvider) {
+        try {
+          await sendPasswordResetEmail(auth, auth.currentUser.email);
+          Swal.fire('Email Sent', 'A password reset email has been sent to your email address!', 'success');
+        } catch (error) {
+          console.error('Error sending password reset email:', error);
+          Swal.fire('Error', 'Failed to send password reset email', 'error');
+        }
+      } else {
+        Swal.fire('Not Supported', 'You are logged in with Google. Password reset is only available for email/password accounts.', 'info');
       }
     }
   };
 
   const handleLogout = () => {
     auth.signOut().then(() => {
-      Navigate('/'); // Redirect to the home page
+      navigate('/dashboard/suid'); // Redirect to /dashboard/suid after logout
     }).catch((error) => {
       console.error('Error signing out:', error);
     });
@@ -70,75 +122,88 @@ const SettingsPage = () => {
   const handleProfilePhotoChange = (e) => {
     if (e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfilePhoto(reader.result);
-      };
-      reader.readAsDataURL(file);
+      setProfilePhoto(file);
     }
   };
 
   return (
-    <div className="settings-container p-4">
-      <h1 className="text-2xl font-bold mb-4">Settings</h1>
+    <div className="settings-container max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">Settings</h1>
       
-      <div className="profile-section mb-6">
-        <h2 className="text-xl font-semibold mb-2">Profile</h2>
-        <div className="mb-4">
-          <label className="block text-gray-700 mb-2">Name:</label>
-          <input 
-            type="text" 
-            value={name} 
-            onChange={(e) => setName(e.target.value)} 
-            className="border p-2 w-full"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 mb-2">Profile Photo:</label>
-          <input 
-            type="file" 
-            accept="image/*" 
-            onChange={handleProfilePhotoChange} 
-            className="border p-2"
-          />
-          {profilePhoto && (
-            <img 
-              src={profilePhoto} 
-              alt="Profile Preview" 
-              className="mt-2 w-20 h-20 rounded-full"
+      {/* Edit Profile Section */}
+      {!isEditing ? (
+        <button 
+          onClick={() => setIsEditing(true)} 
+          className="bg-blue-500 text-white p-3 rounded-lg shadow-lg hover:bg-blue-600 transition-transform transform hover:scale-105"
+        >
+          Edit Profile
+        </button>
+      ) : (
+        <div className="profile-edit-form bg-white p-6 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold mb-4">Edit Profile</h2>
+          <div className="flex items-center mb-4">
+            <div className="w-24 h-24 mr-4">
+              {profilePhoto && typeof profilePhoto === 'string' ? (
+                <img 
+                  src={profilePhoto} 
+                  alt="Profile Preview" 
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center">
+                  <span className="text-gray-500">No Photo</span>
+                </div>
+              )}
+            </div>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleProfilePhotoChange} 
+              className="border p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
             />
-          )}
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-700 mb-2 font-semibold">Username:</label>
+            <input 
+              type="text" 
+              value={userName} 
+              onChange={handleUserNameChange} 
+              className={`border p-2 w-full rounded-lg ${usernameAvailability ? 'border-green-500' : 'border-red-500'} bg-gray-100 hover:bg-gray-200 transition`}
+            />
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-700 mb-2 font-semibold">Name:</label>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              className="border p-2 w-full rounded-lg bg-gray-100 hover:bg-gray-200 transition"
+            />
+          </div>
+          <button 
+            onClick={handleProfileUpdate} 
+            className="bg-green-500 text-white p-3 rounded-lg shadow-lg hover:bg-green-600 transition-transform transform hover:scale-105"
+          >
+            Save Changes
+          </button>
         </div>
-        <button 
-          onClick={handleProfileUpdate} 
-          className="bg-blue-500 text-white p-2 rounded"
-        >
-          Update Profile
-        </button>
-      </div>
-      
-      <div className="password-section mb-6">
-        <h2 className="text-xl font-semibold mb-2">Change Password</h2>
-        <div className="mb-4">
-          <label className="block text-gray-700 mb-2">New Password:</label>
-          <input 
-            type="password" 
-            value={newPassword} 
-            onChange={(e) => setNewPassword(e.target.value)} 
-            className="border p-2 w-full"
-          />
-        </div>
-        <button 
-          onClick={handlePasswordChange} 
-          className="bg-blue-500 text-white p-2 rounded"
-        >
-          Change Password
-        </button>
-      </div>
+      )}
 
+      {/* Forgot Password Button */}
+      {auth.currentUser && (
+        <button 
+          onClick={handleForgotPassword} 
+          className="bg-yellow-500 text-white p-3 rounded-lg shadow-lg hover:bg-yellow-600 transition-transform transform hover:scale-105 mt-4"
+        >
+          Forgot Password
+        </button>
+      )}
+
+      {/* Log Out Button */}
       <button 
         onClick={handleLogout} 
-        className="bg-red-500 text-white p-2 rounded"
+        className="bg-red-500 text-white p-3 rounded-lg shadow-lg hover:bg-red-600 transition-transform transform hover:scale-105 mt-4"
       >
         Log Out
       </button>

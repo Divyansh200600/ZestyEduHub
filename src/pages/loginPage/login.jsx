@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, setDoc, getDoc, query, where, collection, getDocs } from 'firebase/firestore';
 import { auth, googleProvider, firestore } from '../../utils/firebaseConfig';
 import Swal from 'sweetalert2';
 import { FaGoogle, FaEye, FaEyeSlash } from 'react-icons/fa';
@@ -12,6 +12,7 @@ const AuthPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
@@ -19,7 +20,6 @@ const AuthPage = () => {
 
   useEffect(() => {
     if (user) {
-      // Redirect to dashboard if already logged in
       const checkAuth = async () => {
         const userDoc = await getDoc(doc(firestore, 'users', user.uid));
         if (userDoc.exists()) {
@@ -35,7 +35,8 @@ const AuthPage = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      await saveUserToFirestore(user, 'google');
+      const randomUsername = `user${Math.floor(1000 + Math.random() * 9000)}`; // Generate random username
+      await saveUserToFirestore(user, 'google', randomUsername);
       const userDoc = await getDoc(doc(firestore, 'users', user.uid));
       const userSuid = userDoc.data().suid;
       navigate(`/dashboard/${userSuid}`);
@@ -54,6 +55,11 @@ const AuthPage = () => {
   };
 
   const handleSignup = async () => {
+    if (await checkIfUsernameExists(username)) {
+      setError('Username is already taken.');
+      return;
+    }
+
     if (password.length < 6 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
       setError('Password must be at least 6 characters long and include uppercase, lowercase, number, and special character.');
       return;
@@ -67,6 +73,7 @@ const AuthPage = () => {
         name,
         email,
         suid: randomSUID,
+        username,
         provider: 'email'
       });
       navigate(`/dashboard/${randomSUID}`);
@@ -106,7 +113,39 @@ const AuthPage = () => {
     }
   };
 
-  const saveUserToFirestore = async (user, provider) => {
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Forgot Password',
+        text: 'Please enter your email to reset your password.',
+      });
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Swal.fire({
+        icon: 'success',
+        title: 'Password Reset',
+        text: 'Password reset email has been sent to your email address.',
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to send password reset email. Please try again later.',
+      });
+    }
+  };
+
+  const checkIfUsernameExists = async (username) => {
+    const q = query(collection(firestore, "users"), where("username", "==", username));
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  };
+
+  const saveUserToFirestore = async (user, provider, username) => {
     const uid = user.uid;
     const userName = user.displayName || "Anonymous";
     const userEmail = user.email;
@@ -116,12 +155,12 @@ const AuthPage = () => {
       name: userName,
       email: userEmail,
       suid: randomSUID,
+      username,
       provider
     });
   };
 
   if (user) {
-    // Redirect to dashboard if already logged in
     return null;
   }
 
@@ -167,6 +206,12 @@ const AuthPage = () => {
               <FaGoogle className="text-xl" />
               <span>Login with Google</span>
             </button>
+            <button
+              onClick={handleForgotPassword}
+              className="text-blue-500 font-semibold mb-4"
+            >
+              Forgot Password?
+            </button>
             <p className="text-center mt-4">
               Don't have an account? <button onClick={() => setIsLogin(false)} className="text-blue-500 font-semibold">Sign Up</button>
             </p>
@@ -179,6 +224,13 @@ const AuthPage = () => {
               placeholder="Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="w-full p-3 mb-4 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300 ease-in-out"
+            />
+            <input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full p-3 mb-4 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300 ease-in-out"
             />
             <input

@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { FaBell, FaCog } from 'react-icons/fa'; // Import the settings icon
 import { auth } from '../../../utils/firebaseConfig';
 import { fetchUserData } from '../fetchUserData/page';
-import { useNavigate } from 'react-router-dom'; // Import useHistory for navigation
+import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
+
+import Notifications from './noti';
 
 const Header = () => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -22,6 +25,13 @@ const Header = () => {
 
   const navigateToSettings = () => {
     navigate('/settings'); 
+  };
+
+  // Fallback profile photo URL
+  const defaultProfilePhoto = "https://firebasestorage.googleapis.com/v0/b/vr-study-group.appspot.com/o/duggu-store%2Fkawaii-ben.gif?alt=media&token=46095e90-ebbf-48ea-9a27-04af3f501db1";
+
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
   };
 
   return (
@@ -44,25 +54,24 @@ const Header = () => {
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-4">
             <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-              {user?.profilePhoto ? (
-                <img 
-                  src={user.profilePhoto} 
-                  alt="User Profile" 
-                  className="w-10 h-10 rounded-full"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                  <span className="text-gray-600">No Image</span>
-                </div>
-              )}
+              <img 
+                src={user?.profilePhoto || defaultProfilePhoto} 
+                alt="User Profile" 
+                className="w-10 h-10 rounded-full"
+              />
             </div>
             <div>
-              <p className="text-gray-800 font-medium">Hello, <span className="font-semibold">{user?.name || 'User Name'}👋</span></p>
+              <p className="text-gray-800 font-medium">
+                Hello, <span className="font-semibold">{user?.name || 'User Name'}👋</span>
+                {user?.username && (
+                  <span className="text-gray-600 ml-2 text-sm">@{user.username}</span>
+                )}
+              </p>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
-            <button className="bg-gray-200 text-gray-800 p-2 rounded-full hover:bg-gray-300">
+            <button onClick={handleBellClick} className="bg-gray-200 text-gray-800 p-2 rounded-full hover:bg-gray-300">
               <FaBell className="text-lg" /> {/* Notification icon */}
             </button>
             <button 
@@ -73,6 +82,11 @@ const Header = () => {
             </button>
           </div>
         </div>
+        <Notifications
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+       
+      />
       </div>
     </header>
   );
