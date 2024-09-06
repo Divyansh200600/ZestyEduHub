@@ -52,9 +52,8 @@ const FriendDetailPage = () => {
 
       // Fetch profiles for the current user and the friend
       const currentUserData = await fetchUserProfile(currentUser);
-      console.log("Current User Profile: ", currentUserData); // Add this line
       const friendData = await fetchUserProfile(friendId);
-      console.log("Friend Profile: ", friendData); // Add this line
+     
 
       setCurrentUserProfile(currentUserData);
       setFriendProfile(friendData);
@@ -190,6 +189,7 @@ const FriendDetailPage = () => {
       </button>
     </div>
   );
+  
 
   return (
     <div className="min-h-screen bg-gray-100 flex overflow-hidden ">
