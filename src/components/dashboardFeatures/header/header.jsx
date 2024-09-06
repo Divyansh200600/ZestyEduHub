@@ -62,7 +62,7 @@ const Header = () => {
             </div>
             <div>
               <p className="text-gray-800 font-medium">
-                Hello, <span className="font-semibold">{user?.name || 'User Name'}👋</span>
+               <span className="font-semibold">{user?.name || 'User Name'}👋</span>
                 {user?.username && (
                   <span className="text-gray-600 ml-2 text-sm">@{user.username}</span>
                 )}

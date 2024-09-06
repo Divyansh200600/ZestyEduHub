@@ -44,13 +44,10 @@ const GroupInfoPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-    {/* Header at the top */}
-    <Header />
-    
-    <div className="flex flex-1">
-      {/* Sidebar on the left */}
-      <Sidebar />
+    <div className="min-h-screen bg-gray-100 flex overflow-hidden ">
+    <Sidebar className="w-64 bg-gray-200" />
+    <div className="flex-1 flex flex-col items-center">
+      <Header />
       
       {/* Main content on the right */}
       <h1>Group Information</h1>

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { firestore } from '../../../utils/firebaseConfig'; 
 import Swal from 'sweetalert2';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import Header from '../../../components/dashboardFeatures/header/header';
 
 const SettingsPage = () => {
   const [user, setUser] = useState(null);
@@ -127,14 +128,38 @@ const SettingsPage = () => {
   };
 
   return (
+   
+    
+    <div >
+  {/* Background Video */}
+  <video
+    autoPlay
+    loop
+    muted
+    playsInline
+    style={{
+      position: 'fixed',
+     
+     
+      objectFit: 'cover',
+      zIndex: -1,
+    }}
+  >
+    <source src="https://firebasestorage.googleapis.com/v0/b/vr-study-group.appspot.com/o/duggu-store%2FsettingBg.mp4?alt=media&token=ad09b4dd-bb44-499e-9e72-e1458e00554b" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+
+  <div className="flex-1 flex flex-col" >
+  <Header />
+    <div className="min-h-screen flex overflow-hidden">
+   
     <div className="settings-container max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
       
       {/* Edit Profile Section */}
       {!isEditing ? (
         <button 
           onClick={() => setIsEditing(true)} 
-          className="bg-blue-500 text-white p-3 rounded-lg shadow-lg hover:bg-blue-600 transition-transform transform hover:scale-105"
+          className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transform transition-transform hover:scale-105"
         >
           Edit Profile
         </button>
@@ -183,7 +208,7 @@ const SettingsPage = () => {
           </div>
           <button 
             onClick={handleProfileUpdate} 
-            className="bg-green-500 text-white p-3 rounded-lg shadow-lg hover:bg-green-600 transition-transform transform hover:scale-105"
+            className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transform transition-transform hover:scale-105"
           >
             Save Changes
           </button>
@@ -194,7 +219,7 @@ const SettingsPage = () => {
       {auth.currentUser && (
         <button 
           onClick={handleForgotPassword} 
-          className="bg-yellow-500 text-white p-3 rounded-lg shadow-lg hover:bg-yellow-600 transition-transform transform hover:scale-105 mt-4"
+          className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transform transition-transform hover:scale-105 mt-4"
         >
           Forgot Password
         </button>
@@ -203,11 +228,15 @@ const SettingsPage = () => {
       {/* Log Out Button */}
       <button 
         onClick={handleLogout} 
-        className="bg-red-500 text-white p-3 rounded-lg shadow-lg hover:bg-red-600 transition-transform transform hover:scale-105 mt-4"
+        className="bg-gradient-to-r from-red-500 to-red-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transform transition-transform hover:scale-105 mt-4"
       >
         Log Out
       </button>
     </div>
+    </div>
+    </div>
+    </div>
+  
   );
 };
 
