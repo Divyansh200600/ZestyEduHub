@@ -72,6 +72,7 @@ const AuthPage = () => {
       await setDoc(doc(firestore, "users", user.uid), {
         name,
         email,
+        uid: user.uid,
         suid: randomSUID,
         username,
         provider: 'email'
@@ -155,6 +156,7 @@ const AuthPage = () => {
       name: userName,
       email: userEmail,
       suid: randomSUID,
+      uid: uid,
       username,
       provider
     });

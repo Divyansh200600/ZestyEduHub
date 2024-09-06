@@ -24,6 +24,7 @@ const GroupInfoPage = () => {
               name: groupInfo.name,
               id: groupDocSnap.id,
               ownerName: groupInfo.ownerName,
+              userId:groupInfo.userId,
              
             });
           } else {
@@ -56,6 +57,7 @@ const GroupInfoPage = () => {
       <p><strong>Group Name:</strong> {groupData.name}</p>
       <p><strong>Group ID:</strong> {groupData.id}</p>
       <p><strong>Owner Name:</strong> {groupData.ownerName}</p>
+      <p><strong>Owner Uid:</strong>{groupData.userId}</p>
     </div>
     </div>
   );

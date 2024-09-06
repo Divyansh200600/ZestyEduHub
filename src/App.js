@@ -41,7 +41,7 @@ const App = () => {
                   <SettingsPage />
                 </PrivateRoute>
               } />
-               <Route path="/dashboard/$me/:username" element={
+               <Route path="/dashboard/$me/:id" element={
                 <PrivateRoute>
                   <FriendDetailPage />
                 </PrivateRoute>

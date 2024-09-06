@@ -6,7 +6,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import { auth, firestore, storage } from '../../../utils/firebaseConfig';
 import { collection, doc, getDoc, setDoc, query, where, onSnapshot, deleteDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import DynamicProfile from './DynamicProfile'; // Import DynamicProfile
 import { useNavigate } from 'react-router-dom';
 
 Modal.setAppElement('#root');
@@ -16,19 +15,22 @@ const Sidebar = () => {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupImage, setGroupImage] = useState(null);
-  const [userData, setUserData] = useState({ name: '', username: '' });
+  const [userData, setUserData] = useState({ name: '', uid: '' });
   const [userGroups, setUserGroups] = useState([]);
   const [allZests, setAllZests] = useState([]);
   const [userFriends, setUserFriends] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [invitationsWithProfiles, setInvitationsWithProfiles] = useState([]);
   const [selectedFriend, setSelectedFriend] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState(''); // NEW
+  const [selectedGroup, setSelectedGroup] = useState('');
   const [friendModalIsOpen, setFriendModalIsOpen] = useState(false);
   const [invitationModalOpen, setInvitationModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [profiles, setProfiles] = useState({});
-  const navigate = useNavigate(); // For navigating programmatically
+  const navigate = useNavigate();
+
+  const fallbackPhoto = 'https://firebasestorage.googleapis.com/v0/b/vr-study-group.appspot.com/o/duggu-store%2Fkawaii-ben.gif?alt=media&token=46095e90-ebbf-48ea-9a27-04af3f501db1';
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -39,7 +41,7 @@ const Sidebar = () => {
         if (userDocSnap.exists()) {
           setUserData({
             name: userDocSnap.data()?.name || '',
-            username: userDocSnap.data()?.username || ''
+            uid: user.uid
           });
         }
       }
@@ -48,195 +50,253 @@ const Sidebar = () => {
   }, []);
 
   useEffect(() => {
-    if (userData.username) {
-      // Fetch user's groups
-      const q = query(collection(firestore, 'groups'), where('username', '==', userData.username));
-      const unsubscribeGroups = onSnapshot(q, (querySnapshot) => {
+    const fetchInvitationsWithProfiles = async () => {
+      try {
+        const invitePromises = invitations.map(async (invite) => {
+          const { name, profilePhoto } = await fetchUserProfile(invite.sender);
+
+          return {
+            ...invite,
+            name,
+            profilePhoto: profilePhoto || fallbackPhoto
+          };
+        });
+
+        const resolvedInvites = await Promise.all(invitePromises);
+        setInvitationsWithProfiles(resolvedInvites);
+      } catch (error) {
+        console.error('Error fetching profiles:', error);
+      }
+    };
+
+    if (invitations.length > 0) {
+      fetchInvitationsWithProfiles();
+    }
+  }, [invitations]);
+
+  useEffect(() => {
+    const fetchUserDataAndSetupListeners = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        console.error('User is not authenticated.');
+        return;
+      }
+
+      // Listener for user groups
+      const qGroups = query(collection(firestore, 'groups'), where('userId', '==', user.uid));
+      const unsubscribeGroups = onSnapshot(qGroups, (querySnapshot) => {
         const groups = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setUserGroups(groups);
+      }, (error) => {
+        console.error('Error fetching groups:', error);
       });
 
-      // Fetch all users (Zests)
+      // Listener for all users (Zests)
       const qZests = query(collection(firestore, 'users'));
       const unsubscribeZests = onSnapshot(qZests, (querySnapshot) => {
         const zests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAllZests(zests);
+      }, (error) => {
+        console.error('Error fetching users:', error);
       });
 
-      // Fetch user's friends
-      const user = auth.currentUser;
+      // Listener for user friends
       const userFriendsRef = collection(firestore, `users/${user.uid}/friends`);
-      const unsubscribeFriends = onSnapshot(userFriendsRef, (querySnapshot) => {
-        const friends = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUserFriends(friends.filter(friend => friend.status === 'accepted'));
+      const unsubscribeFriends = onSnapshot(userFriendsRef, async (querySnapshot) => {
+        try {
+          const friendPromises = querySnapshot.docs.map(async (doc) => {
+            const friendUID = doc.id;
+            const friendProfile = await fetchUserProfile(friendUID);
+            return { id: friendUID, ...doc.data(), ...friendProfile };
+          });
+
+          const friendsWithProfiles = await Promise.all(friendPromises);
+          setUserFriends(friendsWithProfiles.filter(friend => friend.status === 'accepted'));
+        } catch (error) {
+          console.error('Error processing friends:', error);
+        }
+      }, (error) => {
+        console.error('Error fetching friends:', error);
       });
 
-      // Fetch invitations
-      const qInvitations = query(collection(firestore, 'invitations'), where('recipient', '==', userData.username));
-      const unsubscribeInvitations = onSnapshot(qInvitations, (querySnapshot) => {
-        const invites = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setInvitations(invites);
+      // Listener for invitations
+      const invitationsRef = collection(firestore, `users/${user.uid}/friends`);
+      const unsubscribeInvitations = onSnapshot(invitationsRef, async (querySnapshot) => {
+        try {
+          const invitePromises = querySnapshot.docs.map(async (doc) => {
+            const friendData = doc.data();
+            if (friendData.status === 'pending') {
+              const profileData = await fetchUserProfile(friendData.sender);
+              return { id: doc.id, ...friendData, ...profileData };
+            }
+            return null;
+          });
+
+          const invitesWithProfiles = (await Promise.all(invitePromises)).filter(Boolean);
+          setInvitations(invitesWithProfiles);
+        } catch (error) {
+          console.error('Error processing invitations:', error);
+        }
+      }, (error) => {
+        console.error('Error fetching invitations:', error);
       });
 
+      // Clean up the listeners on component unmount or dependency change
       return () => {
         unsubscribeGroups();
         unsubscribeZests();
         unsubscribeFriends();
         unsubscribeInvitations();
       };
-    }
-  }, [userData.username]);
+    };
 
-  const handleClick = (section) => {
-    setActive(section);
-  };
+    fetchUserDataAndSetupListeners();
+  }, [userData.uid]);
 
+  const handleClick = (section) => setActive(section);
   const openModal = () => setModalIsOpen(true);
   const closeModal = () => setModalIsOpen(false);
-
   const openFriendModal = () => setFriendModalIsOpen(true);
   const closeFriendModal = () => setFriendModalIsOpen(false);
-
   const openInvitationModal = () => setInvitationModalOpen(true);
   const closeInvitationModal = () => setInvitationModalOpen(false);
-
   const handleInvitationClick = () => setInvitationModalOpen(true);
-
-  const handleImageChange = (event) => {
-    setGroupImage(event.target.files[0]);
-  };
+  const handleImageChange = (event) => setGroupImage(event.target.files[0]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     closeModal();
 
-    // Generate a random group ID
+    const user = auth.currentUser;
+    if (!user) return;
+
     const groupId = `hub-${Math.random().toString(36).substring(2, 7)}`;
 
-    // Prepare group details
     const groupDetails = {
       id: groupId,
       name: groupName,
       inviteLink: `http://localhost:3000/invite/${groupId}`,
       ownerName: userData.name,
-      username: userData.username,
+      userId: user.uid
     };
 
-    // Save group details to Firestore
     await setDoc(doc(firestore, 'groups', groupId), groupDetails);
 
-    // Upload group icon if provided
     if (groupImage) {
       const imageRef = ref(storage, `groupData/groupIcons/${groupId}`);
       const uploadTask = await uploadBytes(imageRef, groupImage);
       const downloadURL = await getDownloadURL(uploadTask.ref);
 
-      // Optionally update group details with image URL
       await setDoc(doc(firestore, 'groups', groupId), { iconUrl: downloadURL }, { merge: true });
     }
 
-    // Clear the input fields
     setGroupName('');
     setGroupImage(null);
   };
 
   const handleSendFriendRequest = async () => {
     setLoading(true);
-    const user = auth.currentUser;
-    if (user && user.uid && selectedFriend) {
-      const usersRef = collection(firestore, 'users');
-      const selectedFriendQuery = query(usersRef, where('username', '==', selectedFriend));
-      const selectedFriendSnapshot = await getDocs(selectedFriendQuery);
+    try {
+      const user = auth.currentUser;
+      if (user && user.uid && selectedFriend) {
+        const friendUID = selectedFriend; // Ensure this is the UID
 
-      if (!selectedFriendSnapshot.empty) {
         const friendRequest = {
-          sender: userData.username,
-          recipient: selectedFriend,
+          sender: user.uid,
           status: 'pending'
         };
 
-        // Add a friend request to the invitations collection
-        await setDoc(doc(firestore, 'invitations', `${userData.username}-${selectedFriend}`), friendRequest);
+        await setDoc(doc(firestore, `users/${friendUID}/friends`, user.uid), friendRequest);
 
         setSelectedFriend('');
         toast.success('Friend request sent successfully!');
-      } else {
-        toast.error('User not found!');
       }
+    } catch (error) {
+      toast.error('Error sending friend request.');
+      console.error('Error sending friend request:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleAcceptInvitation = async (invitationId) => {
+  const handleAcceptInvitation = async (senderUID) => {
     const user = auth.currentUser;
     if (user && user.uid) {
-      const invitationDoc = doc(firestore, 'invitations', invitationId);
-      const invitationSnap = await getDoc(invitationDoc);
-      if (invitationSnap.exists()) {
-        // Extract the sender from the invitation
-        const { sender } = invitationSnap.data();
+      const recipientUID = user.uid;
 
-        // Add friend to user's friends collection
-        const userFriendsCol = collection(firestore, `users/${user.uid}/friends`);
-        await setDoc(doc(userFriendsCol, sender), { username: sender, status: 'accepted' });
+      try {
+        const friendRefForRecipient = doc(firestore, `users/${recipientUID}/friends/${senderUID}`);
+        await setDoc(friendRefForRecipient, { status: 'accepted', sender: senderUID }, { merge: true });
 
-        // Remove the invitation
-        await deleteDoc(invitationDoc);
-        setInvitations(invitations.filter(invite => invite.id !== invitationId));
+        const friendRefForSender = doc(firestore, `users/${senderUID}/friends/${recipientUID}`);
+        await setDoc(friendRefForSender, { status: 'accepted', sender: recipientUID }, { merge: true });
 
-        // Additionally update the sender's friends list
-        const senderQuery = query(collection(firestore, 'users'), where('username', '==', sender));
-        const senderSnapshot = await getDocs(senderQuery);
-        if (!senderSnapshot.empty) {
-          const senderDoc = senderSnapshot.docs[0];
-          const friendColInSender = collection(firestore, `users/${senderDoc.id}/friends`);
-          await setDoc(doc(friendColInSender, userData.username), { username: userData.username, status: 'accepted' });
-        }
+        setUserFriends(friends => friends.map(friend =>
+          friend.id === senderUID ? { ...friend, status: 'accepted' } : friend
+        ));
 
         toast.success('Friend request accepted successfully!');
+      } catch (error) {
+        console.error("Error accepting invitation: ", error);
+        toast.error('Failed to accept the invitation.');
       }
+    } else {
+      toast.error('User not authenticated.');
     }
   };
 
-  const handleRejectInvitation = async (invitationId) => {
+  const handleRejectInvitation = async (senderUID) => {
     const user = auth.currentUser;
     if (user && user.uid) {
-      const invitationDoc = doc(firestore, 'invitations', invitationId);
-      const inviteData = (await getDoc(invitationDoc)).data();
+      const recipientUID = user.uid;
 
-      await deleteDoc(invitationDoc);
-      setInvitations(invitations.filter(invite => invite.id !== invitationId));
+      try {
+        const friendRefForRecipient = doc(firestore, `users/${recipientUID}/friends/${senderUID}`);
+        await deleteDoc(friendRefForRecipient);
 
-      // Additionally remove from sender's invitation list
-      if (inviteData) {
-        const senderQuery = query(collection(firestore, 'users'), where('username', '==', inviteData.sender));
-        const senderSnapshot = await getDocs(senderQuery);
-        if (!senderSnapshot.empty) {
-          const senderDocs = senderSnapshot.docs || [];
-          if (senderDocs.length > 0) {
-            const senderDoc = senderDocs[0];
-            const inviteInSenderRef = doc(firestore, `users/${senderDoc.id}/friends`, userData.username);
-            await deleteDoc(inviteInSenderRef);
-          }
-        }
+        const friendRefForSender = doc(firestore, `users/${senderUID}/friends/${recipientUID}`);
+        await deleteDoc(friendRefForSender);
+
+        setUserFriends(friends => friends.filter(friend => friend.id !== senderUID));
+
+        toast.success('Friend request rejected successfully!');
+      } catch (error) {
+        console.error("Error rejecting invitation: ", error);
+        toast.error('Failed to reject the invitation.');
       }
-
-      toast.success('Friend request rejected successfully!');
+    } else {
+      toast.error('User not authenticated.');
     }
   };
 
-  const handleProfileLoaded = (username, profile) => {
-    setProfiles(prevProfiles => ({
-      ...prevProfiles,
-      [username]: profile,
-    }));
+  const fetchUserProfile = async (userId) => {
+    const userRef = doc(firestore, 'users', userId);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const { name, profilePhoto } = userSnap.data();
+      return { name, profilePhoto };
+    }
+
+    return { name: 'Unknown User', profilePhoto: null };
   };
+
+  const filteredZests = allZests.filter(zest => {
+    const zestUid = zest.id || ''; // Make sure 'id' is present and represents UID
+    const userUid = userData.uid || '';
+    const search = searchTerm || '';
+
+    return zestUid !== userUid
+      && zest.username.toLowerCase().includes(search.toLowerCase().replace('@', ''))
+      && !userFriends.some(friend => friend.id === zestUid);
+  });
 
   // New function to handle friend click
   const handleFriendClick = (friend) => {
     setSelectedFriend(friend.username); // NEW
-    navigate(`/dashboard/$me/${friend.username}`, {
+    navigate(`/dashboard/$me/${friend.id}`, {
       state: { username: friend.username, uid: friend.id },
+
     });
   };
 
@@ -247,18 +307,16 @@ const Sidebar = () => {
       state: { groupName: group.name, groupId: group.id }
     });
   };
-  
 
-  const filteredZests = allZests.filter(zest => {
-    return zest.username !== userData.username
-      && zest.username.includes(searchTerm.replace('@', '').toLowerCase())
-      && !userFriends.some(friend => friend.username === zest.username); // Check if already a friend
-  });
+  const isAlreadyFriend = (uid) => {
+    // Check if the UID is already in the list of friends
+    return userFriends.some(friend => friend.id === uid && friend.status === 'accepted');
+  };
+
 
   return (
     <aside className="w-64 bg-gray-800 text-white shadow-md h-screen flex flex-col">
       <ToastContainer />
-      {/* Switcher */}
       <div className="p-4 border-b border-gray-700">
         <div className="mt-2 flex justify-between">
           <button
@@ -276,7 +334,6 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Dynamic Content Based on Active Section */}
       <div className="p-4 flex-grow overflow-y-auto">
         {active === 'group' && (
           <div>
@@ -293,11 +350,10 @@ const Sidebar = () => {
               </button>
             </div>
 
-            {/* List of created groups */}
             <div className="mt-4">
               <div className="flex flex-col space-y-2">
                 {userGroups.map(group => (
-                  <div key={group.id} onClick={() => handleGroupClick(group)} 
+                  <div key={group.id} onClick={() => handleGroupClick(group)}
                     className={`flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer ${selectedGroup === group.id ? 'bg-gray-700' : ''}`}>
                     <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
                       {group.iconUrl ? (
@@ -339,14 +395,11 @@ const Sidebar = () => {
               <div>
                 <div className="flex flex-col space-y-2">
                   {userFriends.map(friend => (
-                    <div key={friend.id} onClick={() => handleFriendClick(friend)} 
+                    <div key={friend.id} onClick={() => handleFriendClick(friend)}
                       className={`flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer ${selectedFriend === friend.username ? 'bg-gray-700' : ''}`}>
-                      <DynamicProfile
-                        username={friend.username}
-                        onProfileLoaded={profile => handleProfileLoaded(friend.username, profile)}
-                      />
+                      <img src={friend.profilePhoto || fallbackPhoto} alt={friend.name} className="w-8 h-8 object-cover rounded-full" />
                       <span className="text-white ml-2">
-                        {profiles[friend.username]?.name || friend.name || friend.username}
+                        {friend.name || friend.username}
                       </span>
                     </div>
                   ))}
@@ -395,15 +448,13 @@ const Sidebar = () => {
             </label>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition-all w-full"
-            >
+              className="bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition-all w-full"            >
               Create Group
             </button>
           </form>
         </div>
       </Modal>
 
-      {/* Modal for Adding Friend */}
       <Modal
         isOpen={friendModalIsOpen}
         onRequestClose={closeFriendModal}
@@ -429,24 +480,32 @@ const Sidebar = () => {
           <div className="flex flex-col space-y-2 mb-4">
             {filteredZests.map(zest => (
               <div key={zest.id} className="flex items-center space-x-2 hover:bg-gray-700 p-2 rounded-md cursor-pointer">
-                <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-                  <span className="text-white">{zest.name ? zest.name.charAt(0) : ''}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedFriend(zest.username);
-                    handleSendFriendRequest();
-                  }}
-                  className="bg-green-600 text-white px-2 py-1 rounded-md shadow-md hover:bg-green-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Sending...' : 'Add'}
-                </button>
+                <img
+                  src={zest.profilePhoto || fallbackPhoto}
+                  alt={zest.name || zest.username}
+                  className="w-8 h-8 object-cover rounded-full"
+                />
+                <span className="text-white ml-2">{zest.name || zest.username}</span>
+                {isAlreadyFriend(zest.id) ? (
+                  <span className="ml-2 text-green-500">&#10003; Already Friends</span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSelectedFriend(zest.id);
+                      handleSendFriendRequest();
+                    }}
+                    className="bg-green-600 text-white px-2 py-1 rounded-md shadow-md hover:bg-green-700"
+                    disabled={loading}
+                  >
+                    {loading ? 'Sending...' : 'Add'}
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </div>
       </Modal>
+
 
       {/* Modal for Invitations */}
       <Modal
@@ -465,24 +524,33 @@ const Sidebar = () => {
           </button>
           <h2 className="text-lg font-semibold mb-4">Invitations</h2>
           <div className="flex flex-col space-y-2 mb-4">
-            {invitations.length === 0 ? (
+            {invitationsWithProfiles.length === 0 ? (
               <p>You have no invitations at the moment.</p>
             ) : (
-              invitations.map(invite => (
+              invitationsWithProfiles.map(invite => (
                 <div key={invite.id} className="flex items-center space-x-2 bg-gray-800 p-2 rounded-md">
-                  <span>{invite.sender}</span>
-                  <button
-                    onClick={() => handleAcceptInvitation(invite.id)}
-                    className="bg-green-600 text-white px-2 py-1 rounded-md shadow-md hover:bg-green-700"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => handleRejectInvitation(invite.id)}
-                    className="bg-red-600 text-white px-2 py-1 rounded-md shadow-md hover:bg-red-700"
-                  >
-                    Reject
-                  </button>
+                  <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                    <img
+                      src={invite.profilePhoto || fallbackPhoto}
+                      alt={invite.name}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+                  <span>{invite.name}</span>
+                  <div className="flex ml-auto space-x-2">
+                    <button
+                      onClick={() => handleAcceptInvitation(invite.id)}
+                      className="bg-green-600 text-white px-2 py-1 rounded-md shadow-md hover:bg-green-700"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleRejectInvitation(invite.id)}
+                      className="bg-red-600 text-white px-2 py-1 rounded-md shadow-md hover:bg-red-700"
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
               ))
             )}

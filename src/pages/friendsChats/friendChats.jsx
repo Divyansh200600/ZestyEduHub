@@ -5,7 +5,7 @@ import Header from '../../components/dashboardFeatures/header/header';
 import Sidebar from '../../components/dashboardFeatures/sidebar/sidebar';
 
 const FriendDetailPage = () => {
-  const { username } = useParams(); // Get the dynamic username from the route
+  const { id } = useParams(); // Get the dynamic username from the route
   
 
   
@@ -20,7 +20,7 @@ const FriendDetailPage = () => {
       
       {/* Main content on the right */}
       <main className="flex-1 p-6 bg-gray-50">
-       <p>UserName : {username}</p>
+       <p>uid : {id}</p>
         {/* Add more dashboard content here */}
       </main>
     </div>
