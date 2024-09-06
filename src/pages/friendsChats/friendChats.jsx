@@ -35,17 +35,18 @@ const FriendDetailPage = () => {
   const isEditing = editMessageId !== null;
 
   useEffect(() => {
-    const fetchUserProfile = async (userId) => { // Modify to include userId
-      if (!userId) return { id: userId, name: 'Unknown', profilePhoto: fallbackPhotoUrl };
+    const fetchUserProfile = async (userId) => {
+      if (!userId) return { name: 'Unknown', profilePhoto: fallbackPhotoUrl };
       
       const userDoc = doc(firestore, 'users', userId);
       const userSnapshot = await getDoc(userDoc);
       if (userSnapshot.exists()) {
-        return { id: userId, ...userSnapshot.data() }; // Return with userId
+        return userSnapshot.data();
       } else {
-        return { id: userId, name: 'Unknown', profilePhoto: fallbackPhotoUrl };
+        return { name: 'Unknown', profilePhoto: fallbackPhotoUrl };
       }
-    };
+    };  
+    
 
     const fetchChatDetails = async () => {
       if (!currentUser) return;
@@ -87,6 +88,8 @@ const FriendDetailPage = () => {
 
     fetchChatDetails();
   }, [chatId, currentUser, firestore, fallbackPhotoUrl]);
+
+
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -200,7 +203,7 @@ const FriendDetailPage = () => {
         <main className="flex-1 flex flex-col p-6 bg-gray-50 relative w-full max-w-4xl right-24">
           <SidePanel chatId={chatId} currentUserProfile={currentUserProfile} friendProfile={friendProfile} />
           <div className="w-full max-w-3xl mx-auto flex flex-col">
-            <div className="flex items-center space-x-4 mb-6">
+          <div className="flex items-center space-x-4 mb-6">
               <div className="w-12 h-12 rounded-full bg-gray-300">
                 <img
                   src={friendProfile.profilePhoto || fallbackPhotoUrl}
@@ -230,18 +233,16 @@ const FriendDetailPage = () => {
                     className={`flex items-start mb-4 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                     onContextMenu={(e) => handleContextMenu(e, msg)}
                   >
-                    {!isCurrentUser && (
-                      <img
-                        src={senderProfile.profilePhoto || fallbackPhotoUrl}
-                        alt={senderProfile.name}
-                        className="w-8 h-8 rounded-full mr-2"
-                        onError={(e) => { e.target.src = fallbackPhotoUrl; }}
-                      />
-                    )}
+                    <img
+                      src={senderProfile.profilePhoto || fallbackPhotoUrl}
+                      alt={senderProfile.name}
+                      className="w-8 h-8 rounded-full mr-2"
+                      onError={(e) => { e.target.src = fallbackPhotoUrl; }}
+                    />
                     <div
                       className={`p-2 rounded-lg ${isCurrentUser ? 'bg-blue-100' : 'bg-gray-100'}`}
                     >
-                      <p className="font-semibold">{senderProfile.name}</p>
+                    
                       <p dangerouslySetInnerHTML={{ __html: msg.text }} />
                       {msg.edited && (
                         <span className="text-xs text-green-500 flex items-center">
@@ -253,6 +254,7 @@ const FriendDetailPage = () => {
                           <FaEdit className="mr-1" /> Seen
                         </span>
                       )}
+                        <p className="font-semibold">{senderProfile.name}</p>
                     </div>
                   </div>
                 );

@@ -38,8 +38,6 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
     };
   }, []);
 
-
-
   // Start the local video stream and notify others
   const startVideo = async () => {
     try {
@@ -127,7 +125,7 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
       )}
 
       {/* Remote Video Streams */}
-      <div className="fixed bottom-44 right-4 flex flex-col space-y-2">
+      <div className="fixed bottom-44 right-5 flex flex-col space-y-2">
         {Object.keys(remoteStreams).map((userId) => (
           <div key={userId} className="relative w-48 h-36 bg-black rounded-lg overflow-hidden shadow-lg">
             <video
@@ -140,7 +138,7 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
               className="w-full h-full object-cover"
             />
             <span className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-sm px-2 py-1 rounded">
-              {friendProfile.name || userId} {/* Show friend's name if available, otherwise fallback to userId */}
+              {friendProfile.name || userId} 
             </span>
           </div>
         ))}
