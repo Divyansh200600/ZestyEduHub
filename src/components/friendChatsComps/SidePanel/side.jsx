@@ -85,34 +85,61 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
 
   return (
     <>
-      {/* Grey Sidebar Mini Panel */}
-      <div className="fixed bottom-4 right-4 bg-gray-800 text-white shadow-lg rounded-lg p-4 flex space-x-4">
-        {/* Control Panel */}
+    {/* Grey Sidebar Mini Panel */}
+    <div className="fixed bottom-4 right-2 bg-gray-800 text-white shadow-lg rounded-lg p-2 flex space-x-1">
+      {/* Control Panel */}
+      <div className="relative group">
         <button
-          className={`flex items-center justify-center p-3 rounded-full ${micEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
+          className="flex items-center justify-center p-3 rounded-full bg-green-500 hover:bg-green-600 active:bg-green-400 transition-colors"
           onClick={() => setMicEnabled(!micEnabled)}
         >
-          {micEnabled ? <FaMicrophone className="text-white text-xl" /> : <FaMicrophoneSlash className="text-gray-600 text-xl" />}
+          {micEnabled ? <FaMicrophone className="text-white text-xl" /> : <FaMicrophoneSlash className="text-white text-xl" />}
         </button>
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-max px-2 py-1 text-sm text-white bg-black rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+         
+          Mic
+        </div>
+      </div>
+      
+      <div className="relative group">
         <button
-          className={`flex items-center justify-center p-3 rounded-full ${videoEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}
+          className="flex items-center justify-center p-3 rounded-full bg-blue-500 hover:bg-blue-600 active:bg-blue-400 transition-colors"
           onClick={() => setVideoEnabled(!videoEnabled)}
         >
-          {videoEnabled ? <FaVideo className="text-white text-xl" /> : <FaVideoSlash className="text-gray-600 text-xl" />}
+          {videoEnabled ? <FaVideo className="text-white text-xl" /> : <FaVideoSlash className="text-white text-xl" />}
         </button>
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-max px-2 py-1 text-sm text-white bg-black rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        
+          Video
+        </div>
+      </div>
+
+      <div className="relative group">
         <button
-          className="flex items-center justify-center p-3 rounded-full bg-yellow-500"
-          onClick={() => alert('Document sharing coming soon!')}
+          className="flex items-center justify-center p-3 rounded-full bg-yellow-500 hover:bg-yellow-600 active:bg-yellow-400 transition-colors cursor-not-allowed"
+          onClick={() => {/* Implement document sharing functionality */}}
+          disabled
         >
           <FaFile className="text-white text-xl" />
         </button>
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-max px-2 py-1 text-sm text-white bg-black rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          Share Document 
+        </div>
+      </div>
+
+      <div className="relative group">
         <button
-          className="flex items-center justify-center p-3 rounded-full bg-purple-500"
-          onClick={() => alert('Resource sharing coming soon!')}
+          className="flex items-center justify-center p-3 rounded-full bg-purple-500 hover:bg-purple-600 active:bg-purple-400 transition-colors cursor-not-allowed"
+          onClick={() => {/* Implement resource sharing functionality */}}
+          disabled
         >
           <FaShareAlt className="text-white text-xl" />
         </button>
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-max px-2 py-1 text-sm text-white bg-black rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          Share Resources
+        </div>
       </div>
+    </div>
 
       {/* Local Video */}
       {videoEnabled && (

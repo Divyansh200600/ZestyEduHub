@@ -200,11 +200,11 @@ const FriendDetailPage = () => {
       <Sidebar className="w-64 bg-gray-200" />
       <div className="flex-1 flex flex-col items-center">
         <Header />
-        <main className="flex-1 flex flex-col p-6 bg-gray-50 relative w-full max-w-4xl right-24">
+        <main className="flex-1 flex flex-col p-6  relative w-full max-w-4xl right-24">
           <SidePanel chatId={chatId} currentUserProfile={currentUserProfile} friendProfile={friendProfile} />
           <div className="w-full max-w-3xl mx-auto flex flex-col">
           <div className="flex items-center space-x-4 mb-6">
-              <div className="w-12 h-12 rounded-full bg-gray-300">
+              <div className="w-12 h-12 ">
                 <img
                   src={friendProfile.profilePhoto || fallbackPhotoUrl}
                   alt={friendProfile.name}
