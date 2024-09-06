@@ -11,10 +11,12 @@ import { FaEdit, FaTrash } from 'react-icons/fa'; // Import icons
 const FriendDetailPage = () => {
   const { id: chatId } = useParams(); // Get the chatId from the route
   const [friendProfile, setFriendProfile] = useState({
+    id: 'N/A',
     name: 'Unknown',
     profilePhoto: 'https://firebasestorage.googleapis.com/v0/b/vr-study-group.appspot.com/o/duggu-store%2Fkawaii-ben.gif?alt=media&token=46095e90-ebbf-48ea-9a27-04af3f501db1'
   });
   const [currentUserProfile, setCurrentUserProfile] = useState({
+    id: 'N/A',
     name: 'Your Name',
     profilePhoto: 'https://firebasestorage.googleapis.com/v0/b/vr-study-group.appspot.com/o/duggu-store%2Fkawaii-ben.gif?alt=media&token=46095e90-ebbf-48ea-9a27-04af3f501db1'
   });
@@ -28,19 +30,20 @@ const FriendDetailPage = () => {
   const contextMenuRef = useRef(null);
 
   const [contextMenu, setContextMenu] = useState(null);
+  const [selectedMessage, setSelectedMessage] = useState(null);
   const [editMessageId, setEditMessageId] = useState(null);
   const isEditing = editMessageId !== null;
 
   useEffect(() => {
-    const fetchUserProfile = async (userId) => {
-      if (!userId) return { name: 'Unknown', profilePhoto: fallbackPhotoUrl };
+    const fetchUserProfile = async (userId) => { // Modify to include userId
+      if (!userId) return { id: userId, name: 'Unknown', profilePhoto: fallbackPhotoUrl };
       
       const userDoc = doc(firestore, 'users', userId);
       const userSnapshot = await getDoc(userDoc);
       if (userSnapshot.exists()) {
-        return userSnapshot.data();
+        return { id: userId, ...userSnapshot.data() }; // Return with userId
       } else {
-        return { name: 'Unknown', profilePhoto: fallbackPhotoUrl };
+        return { id: userId, name: 'Unknown', profilePhoto: fallbackPhotoUrl };
       }
     };
 
@@ -53,7 +56,6 @@ const FriendDetailPage = () => {
       // Fetch profiles for the current user and the friend
       const currentUserData = await fetchUserProfile(currentUser);
       const friendData = await fetchUserProfile(friendId);
-     
 
       setCurrentUserProfile(currentUserData);
       setFriendProfile(friendData);
@@ -189,14 +191,14 @@ const FriendDetailPage = () => {
       </button>
     </div>
   );
-  
 
   return (
-    <div className="min-h-screen bg-gray-100 flex overflow-hidden ">
+    <div className="min-h-screen bg-gray-100 flex overflow-hidden">
       <Sidebar className="w-64 bg-gray-200" />
       <div className="flex-1 flex flex-col items-center">
         <Header />
         <main className="flex-1 flex flex-col p-6 bg-gray-50 relative w-full max-w-4xl right-24">
+          <SidePanel chatId={chatId} currentUserProfile={currentUserProfile} friendProfile={friendProfile} />
           <div className="w-full max-w-3xl mx-auto flex flex-col">
             <div className="flex items-center space-x-4 mb-6">
               <div className="w-12 h-12 rounded-full bg-gray-300">
@@ -228,12 +230,14 @@ const FriendDetailPage = () => {
                     className={`flex items-start mb-4 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                     onContextMenu={(e) => handleContextMenu(e, msg)}
                   >
-                    <img
-                      src={senderProfile.profilePhoto || fallbackPhotoUrl}
-                      alt={senderProfile.name}
-                      className="w-8 h-8 rounded-full mr-2"
-                      onError={(e) => { e.target.src = fallbackPhotoUrl; }}
-                    />
+                    {!isCurrentUser && (
+                      <img
+                        src={senderProfile.profilePhoto || fallbackPhotoUrl}
+                        alt={senderProfile.name}
+                        className="w-8 h-8 rounded-full mr-2"
+                        onError={(e) => { e.target.src = fallbackPhotoUrl; }}
+                      />
+                    )}
                     <div
                       className={`p-2 rounded-lg ${isCurrentUser ? 'bg-blue-100' : 'bg-gray-100'}`}
                     >
@@ -274,10 +278,6 @@ const FriendDetailPage = () => {
             </form>
           </div>
         </main>
-      </div>
-      <div className="w-64 bg-gray-200 hidden md:flex md:flex-col fixed top-0 right-0 h-full shadow-lg rounded-lg p-4">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Controls</h2>
-        <SidePanel />
       </div>
       {contextMenu && (
         <ContextMenu
