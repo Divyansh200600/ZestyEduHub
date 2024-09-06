@@ -293,11 +293,11 @@ const Sidebar = () => {
 
   // New function to handle friend click
   const handleFriendClick = (friend) => {
-    setSelectedFriend(friend.username); // NEW
-    navigate(`/dashboard/$me/${friend.id}`, {
-      state: { username: friend.username, uid: friend.id },
+    // Generate a chatId based on both user IDs
+    const chatId = [userData.uid, friend.id].sort().join('_');
 
-    });
+    // Navigate to the chat route with dynamically generated chatId
+    navigate(`/chat/${chatId}`);
   };
 
   // NEW function to handle group click
