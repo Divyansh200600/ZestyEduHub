@@ -6,6 +6,7 @@ import { storage, firestore } from '../../../utils/firebaseConfig'; // Import Fi
 import ResourceModal from '../modals/ResourceModal';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
+import DocumentModal from '../modals/DocumentModal'; // Import the new Document Modal
 
 const socket = io('http://localhost:4000');
 
@@ -14,10 +15,9 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [stream, setStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState({});
-  const [showDocEditor, setShowDocEditor] = useState(false);
-  const [showResourceViewer, setShowResourceViewer] = useState(false);
   const videoRef = useRef();
   const [showResourceModal, setShowResourceModal] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false); // New modal state for documents
 
 
 
@@ -92,11 +92,7 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
     });
   };
 
-  // Handle document sharing
-  const handleDocumentSharing = () => {
-    setShowDocEditor(true);
-  };
-
+ 
   // Handle file upload and metadata saving
   const handleUploadFile = async (file) => {
     try {
@@ -120,6 +116,11 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
       console.error('Error uploading file:', error);
     }
   };
+
+ // Handle document sharing
+ const handleDocumentSharing = () => {
+  setShowDocumentModal(true); // Show the document modal when sharing is clicked
+};
 
   return (
     <>
@@ -213,42 +214,19 @@ const SidePanel = ({ chatId, currentUserProfile, friendProfile }) => {
         chatId={chatId}  // Pass chatId to ResourceModal
       />
 
-      {/* Collaborative Document Editor */}
-      {showDocEditor && (
-        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex justify-center items-center">
-          <iframe
-            src="https://docs.google.com/document/d/your-document-id/edit"
-            width="80%"
-            height="80%"
-            title="Collaborative Document Editor"
-          />
-          <button
-            className="absolute top-4 right-4 text-white bg-red-500 p-2 rounded"
-            onClick={() => setShowDocEditor(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
+      {/* Collaborative Document Modal */}
+      <DocumentModal
+        show={showDocumentModal}
+        onClose={() => setShowDocumentModal(false)}
+        onUpload={handleUploadFile}
+        chatId={chatId}
+        currentUserProfile={currentUserProfile} 
+      />
+   
+   
 
-      {/* Resource Viewer */}
-      {showResourceViewer && (
-        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex justify-center items-center">
-          <iframe
-            src="https://docs.google.com/viewer?url=https://example.com/your-resource.pdf"
-            width="80%"
-            height="80%"
-            title="Resource Viewer"
-          />
-          <button
-            className="absolute top-4 right-4 text-white bg-red-500 p-2 rounded"
-            onClick={() => setShowResourceViewer(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
-    </>
+    </>  
+ 
   );
 };
 
