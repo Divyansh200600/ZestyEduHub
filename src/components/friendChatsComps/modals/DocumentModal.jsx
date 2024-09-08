@@ -1,25 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { firestore } from '../../../utils/firebaseConfig';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { EditorState } from '@codemirror/state';
-import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view';
-import { highlightSelectionMatches } from '@codemirror/search';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { cpp } from '@codemirror/lang-cpp';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { autocompletion, completeFromList } from '@codemirror/autocomplete';
-import { basicSetup } from '@codemirror/basic-setup';
+import AceEditor from 'react-ace';
+
+import 'ace-builds/src-noconflict/mode-javascript';
+import 'ace-builds/src-noconflict/mode-python';
+import 'ace-builds/src-noconflict/mode-html';
+import 'ace-builds/src-noconflict/mode-css';
+import 'ace-builds/src-noconflict/mode-c_cpp';
+import 'ace-builds/src-noconflict/theme-monokai';
 
 const languageExtensions = {
-  javascript: [javascript(), autocompletion()],
-  python: [python(), autocompletion()],
-  html: [html(), autocompletion()],
-  css: [css(), autocompletion()],
-  cpp: [cpp(), autocompletion()],
-  'express.js': [javascript(), autocompletion()],
+  javascript: 'javascript',
+  python: 'python',
+  html: 'html',
+  css: 'css',
+  cpp: 'c_cpp',
+  'express.js': 'javascript',
 };
 
 const defaultCode = {
@@ -40,11 +37,11 @@ const DocumentModal = ({ show, onClose, chatId, currentUserProfile }) => {
   const [output, setOutput] = useState('');
   const [fileNames, setFileNames] = useState({ html: 'index.html', css: 'styles.css', javascript: 'script.js' });
 
+  // Live updates and fetching content without sending too many read/write requests
   useEffect(() => {
     if (!chatId) return;
 
     const docRef = doc(firestore, 'friendsChats', chatId, 'documents', 'plainDocument');
-    const codeRef = doc(firestore, 'friendsChats', chatId, 'documents', 'code');
 
     const unsubscribeDoc = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -55,45 +52,26 @@ const DocumentModal = ({ show, onClose, chatId, currentUserProfile }) => {
       setError('Failed to fetch document content.');
     });
 
-    const unsubscribeCode = onSnapshot(codeRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setCodeContent(docSnap.data() || defaultCode);
-      }
-    }, (err) => {
-      console.error("Error fetching code content:", err);
-      setError('Failed to fetch code content.');
-    });
-
     return () => {
       unsubscribeDoc();
-      unsubscribeCode();
     };
   }, [chatId]);
 
-  useEffect(() => {
-    if (isIdeMode) {
-      const editor = new EditorView({
-        state: EditorState.create({
-          doc: codeContent[language],
-          extensions: [
-            basicSetup,
-            ...languageExtensions[language],
-            oneDark,
-            lineNumbers(),
-            highlightActiveLine(),
-            highlightSelectionMatches(),
-            keymap.of([]),  // You can add keybindings similar to VS Code here
-            autocompletion({
-              activateOnTyping: true,
-              completeFromList: completeFromList(['const', 'let', 'var', 'function', 'if', 'else'])
-            })
-          ]
-        }),
-        parent: document.getElementById('editor-container')
-      });
-      return () => editor.destroy();
+  const handleDocContentChange = async (value) => {
+    setDocContent(value);
+
+    try {
+      if (value && currentUserProfile?.uid) {
+        const docRef = doc(firestore, 'friendsChats', chatId, 'documents', 'plainDocument');
+        await setDoc(docRef, { content: value, lastUpdatedBy: currentUserProfile.uid });
+      } else if (!value) {
+        setError('Content is undefined.');
+      }
+    } catch (err) {
+      console.error("Error updating document:", err);
+      setError('Failed to update the document.');
     }
-  }, [isIdeMode, language, codeContent]);
+  };
 
   const handleContentChange = (value, lang = language) => {
     if (isIdeMode) {
@@ -114,6 +92,7 @@ const DocumentModal = ({ show, onClose, chatId, currentUserProfile }) => {
     }
   };
 
+
   const handleFileNameChange = (e) => {
     const { name, value } = e.target;
     setFileNames((prevFileNames) => ({ ...prevFileNames, [name]: value }));
@@ -124,18 +103,6 @@ const DocumentModal = ({ show, onClose, chatId, currentUserProfile }) => {
   };
 
   const switchMode = () => {
-    if (isIdeMode) {
-      if (codeContent[language] && currentUserProfile?.uid) {
-        const docRef = doc(firestore, 'friendsChats', chatId, 'documents', 'plainDocument');
-        setDoc(docRef, { content: codeContent[language], lastUpdatedBy: currentUserProfile.uid })
-          .catch(err => {
-            console.error("Error updating document:", err);
-            setError('Failed to update the document.');
-          });
-      } else if (!codeContent[language]) {
-        setError('Content is undefined.');
-      }
-    }
     setIsIdeMode(!isIdeMode);
   };
 
@@ -248,7 +215,24 @@ const DocumentModal = ({ show, onClose, chatId, currentUserProfile }) => {
                   </>
                 )}
                 {language !== 'html' && (
-                  <div id="editor-container" className="w-full h-full"></div>
+                  <AceEditor
+                    mode={languageExtensions[language]}
+                    theme="monokai"
+                    onChange={(value) => handleContentChange(value)}
+                    name="code-editor"
+                    fontSize={14}
+                    value={codeContent[language]}
+                    width="100%"
+                    height="100%"
+                    setOptions={{
+                      enableBasicAutocompletion: true,
+                      enableLiveAutocompletion: true,
+                      enableSnippets: true,
+                      showLineNumbers: true,
+                      tabSize: 2,
+                      useWorker: false // Disable workers to prevent network error
+                    }}
+                  />
                 )}
               </div>
 
@@ -266,7 +250,7 @@ const DocumentModal = ({ show, onClose, chatId, currentUserProfile }) => {
             <textarea
               className="w-full h-full p-2 border border-gray-800 rounded-lg resize-none overflow-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-200 bg-gray-900 text-white"
               value={docContent}
-              onChange={(e) => handleContentChange(e.target.value)}
+              onChange={(e) => handleDocContentChange(e.target.value)}
               placeholder="Write your document content..."
             />
           )}
